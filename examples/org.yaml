@@ -1,0 +1,39 @@
+# Fictional org chart. The tree is the single source of truth:
+# who reports to whom, which prompt/skill files each agent owns.
+orchestrator:
+  name: orchestrator
+  description: Decides alone; only it may ask a human, and only on fixed topics.
+
+managers:
+  - name: docs-manager
+    area: docs
+    agents:
+      - name: docs-writer
+        description: Drafts and updates how-to pages.
+        prompt: prompts/docs-writer.md
+        skills: [skills/style-guide.md]
+        schedule: "0 9 * * 1-5"
+        subagents:
+          - name: link-checker
+            description: Finds broken links in one page.
+            prompt: prompts/link-checker.md
+
+  - name: triage-manager
+    area: triage
+    agents:
+      - name: issue-triager
+        description: Labels and routes new issues.
+        prompt: prompts/issue-triager.md
+        schedule: "*/30 * * * *"
+        subagents:
+          - name: duplicate-finder
+            description: Looks for an existing issue with the same cause.
+
+  - name: release-manager
+    area: release
+    agents:
+      - name: release-notes
+        description: Writes release notes from merged changes.
+        prompt: prompts/release-notes.md
+        skills: [skills/style-guide.md]
+        schedule: "0 16 * * 5"
