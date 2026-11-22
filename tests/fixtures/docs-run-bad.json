@@ -1,0 +1,11 @@
+{
+  "name": "docs-run-bad",
+  "events": [
+    {"type": "escalation", "sender": "docs-manager", "recipient": "human", "topic": "money"},
+    {"type": "escalation", "sender": "orchestrator", "recipient": "human", "topic": "typo"},
+    {"type": "change", "reviewer": "docs-manager", "run_id": "r1", "path": "a.md"},
+    {"type": "change", "reviewer": "docs-manager", "run_id": "r1", "path": "b.md"},
+    {"type": "change", "reviewer": "docs-manager", "run_id": "r1", "path": "c.md"},
+    {"type": "evaluation", "change": "c0", "verdict": "revert", "restored": false}
+  ]
+}

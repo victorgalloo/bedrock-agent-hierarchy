@@ -1,0 +1,11 @@
+{
+  "name": "docs-run-ok",
+  "events": [
+    {"type": "escalation", "sender": "link-checker", "recipient": "docs-writer"},
+    {"type": "escalation", "sender": "docs-manager", "recipient": "orchestrator"},
+    {"type": "escalation", "sender": "orchestrator", "recipient": "human", "topic": "money"},
+    {"type": "change", "reviewer": "docs-manager", "run_id": "r1", "path": "prompts/docs-writer.md"},
+    {"type": "change", "reviewer": "docs-manager", "run_id": "r1", "path": "skills/style-guide.md"},
+    {"type": "evaluation", "change": "c0", "verdict": "revert", "restored": true}
+  ]
+}
