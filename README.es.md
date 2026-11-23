@@ -65,6 +65,29 @@ change = cm.request("docs-manager", "run-1", "docs-writer", "prompts/docs-writer
 Los modelos corren con la API Converse de Bedrock (`BedrockModel("<id-de-modelo-claude-o-inference-profile>")`);
 las pruebas usan `FakeModel` y nunca tocan la red.
 
+## Monitorear un área sin llamar al modelo
+
+Ejecuta dos veces el ejemplo del área ficticia de documentación desde la raíz del repositorio:
+
+```bash
+python examples/monitor_area.py .agent_hierarchy/demo/docs.json
+python examples/monitor_area.py .agent_hierarchy/demo/docs.json
+```
+
+Si el archivo aún no existe, la primera revisión muestra `wake: first run`; con los mismos datos,
+la siguiente muestra `skip`. En una tarea programada, llama a `collect_snapshot` con la fecha de
+revisión y el historial de corridas de un área (de la más antigua a la más reciente; incluye
+corridas previas a la última revisión si hacen falta para detectar fallos consecutivos). Pasa los
+identificadores de las rutinas bloqueadas, las caídas de KPI detectadas y los conflictos entre
+agentes, además del número de encargos abiertos. Quien llama a la función lee sus propios registros
+y decide qué se considera una caída de KPI o un conflicto.
+
+Usa un archivo de estado distinto para cada área. En cada revisión, carga el estado anterior,
+llama a `should_wake` y guarda el estado actual después de atender el resultado, incluso si no
+despiertas al gerente. Esto permite detectar como nueva una excepción que se resolvió y volvió a
+aparecer. Una nueva semana ISO o cualquier encargo abierto también despierta al gerente. No
+ejecutes revisiones simultáneas de la misma área para que no se sobrescriba su estado.
+
 ## Reglas de diseño
 
 1. **El organigrama es un dato.** `org.yaml` es la única fuente de verdad y se valida al cargarse.
@@ -87,7 +110,7 @@ las pruebas usan `FakeModel` y nunca tocan la red.
 | `agent_hierarchy/org.py` | Carga y validación del organigrama |
 | `agent_hierarchy/escalation.py` | Rutas de escalamiento y preguntas a humanos |
 | `agent_hierarchy/changes.py` | Respaldo, límite de cambios, archivos ocupados, evaluación, restauración |
-| `agent_hierarchy/monitor.py` | Stub: decisión de despertar (colectores pendientes) |
+| `agent_hierarchy/monitor.py` | Recopila señales del área, guarda el estado y decide si despierta al gerente |
 | `agent_hierarchy/bedrock.py` | Stub: adaptador Converse + `FakeModel` (tool use pendiente) |
 | `agent_hierarchy/evals.py` | Stub: califica corridas grabadas (ciclo de replay pendiente) |
 

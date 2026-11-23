@@ -64,6 +64,26 @@ change = cm.request("docs-manager", "run-1", "docs-writer", "prompts/docs-writer
 Models run through the Bedrock Converse API (`BedrockModel("<claude-model-id-or-inference-profile>")`);
 tests use `FakeModel` and never touch the network.
 
+## Monitor an area without calling a model
+
+Run the fictional docs-area example twice from the repository root:
+
+```bash
+python examples/monitor_area.py .agent_hierarchy/demo/docs.json
+python examples/monitor_area.py .agent_hierarchy/demo/docs.json
+```
+
+On a fresh path, the first check reports `wake: first run`; the same inputs then report `skip`.
+In a scheduled job, call `collect_snapshot` with the check date and one area's routine run history
+(oldest first, including runs from before the last check if needed to see consecutive failures).
+Pass IDs for currently blocked routines, detected KPI drops and conflicting agents, plus the
+open-request count. The caller reads its logs and decides what counts as a KPI drop or conflict.
+
+Use a separate snapshot path for each area. In each check, load the previous snapshot, call
+`should_wake`, and save the current snapshot after handling the decision, even on a skip. Saving on
+a skip lets a cleared exception count as new if it returns. A new ISO week or any open request also
+wakes the manager. Serialize checks for the same area so they don't overwrite each other's state.
+
 ## Design rules
 
 1. **Org chart as data.** `org.yaml` is the single source of truth, validated on load.
@@ -86,7 +106,7 @@ tests use `FakeModel` and never touch the network.
 | `agent_hierarchy/org.py` | Org chart loading and validation |
 | `agent_hierarchy/escalation.py` | Escalation routes and human questions |
 | `agent_hierarchy/changes.py` | Backup, change limits, busy files, evaluation, restore |
-| `agent_hierarchy/monitor.py` | Stub: wake decision (collectors TODO) |
+| `agent_hierarchy/monitor.py` | Collects area signals, persists snapshots and decides whether to wake |
 | `agent_hierarchy/bedrock.py` | Stub: Converse adapter + `FakeModel` (tool use TODO) |
 | `agent_hierarchy/evals.py` | Stub: scores recorded runs (replay loop TODO) |
 
