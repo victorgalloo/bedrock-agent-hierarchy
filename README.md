@@ -64,6 +64,34 @@ change = cm.request("docs-manager", "run-1", "docs-writer", "prompts/docs-writer
 Models run through the Bedrock Converse API (`BedrockModel("<claude-model-id-or-inference-profile>")`);
 tests use `FakeModel` and never touch the network.
 
+## Send a Bedrock tool result
+
+Use `BedrockModel.converse_with_tools(system, transcript, tool_config)` with a
+tool-capable model and a native Bedrock `toolConfig` dictionary (including `tools`).
+The adapter sends one Converse request and returns the assistant's full message and
+stop reason. It never executes tools. The text-only `converse` API is unchanged.
+
+This example assumes a single request for the fictional, read-only `lookup_docs` tool.
+Validate the tool name and input in your application before executing any tool.
+
+```python
+turn = model.converse_with_tools(system, transcript, tool_config)
+if turn.stop_reason == "tool_use":
+    request = next(block["toolUse"] for block in turn.message["content"] if "toolUse" in block)
+    if request["name"] == "lookup_docs" and request["input"] == {"page": "setup"}:
+        reply = {
+            "role": "user",
+            "content": [{"toolResult": {
+                "toolUseId": request["toolUseId"],
+                "content": [{"json": {"found": True}}],
+            }}],
+        }
+        turn = model.converse_with_tools(system, [*transcript, turn.message, reply], tool_config)
+```
+
+Keep the entire assistant message in the transcript, even when it also contains text.
+For multiple tool requests, send a matching result block for each ID in one user message.
+
 ## Monitor an area without calling a model
 
 Run the fictional docs-area example twice from the repository root:
@@ -107,7 +135,7 @@ wakes the manager. Serialize checks for the same area so they don't overwrite ea
 | `agent_hierarchy/escalation.py` | Escalation routes and human questions |
 | `agent_hierarchy/changes.py` | Backup, change limits, busy files, evaluation, restore |
 | `agent_hierarchy/monitor.py` | Collects area signals, persists snapshots and decides whether to wake |
-| `agent_hierarchy/bedrock.py` | Stub: Converse adapter + `FakeModel` (tool use TODO) |
+| `agent_hierarchy/bedrock.py` | Converse adapter with tool-use messages + `FakeModel` |
 | `agent_hierarchy/evals.py` | Stub: scores recorded runs (replay loop TODO) |
 
 ## Links

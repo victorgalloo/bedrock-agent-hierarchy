@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypedDict
 
 
 class Message(TypedDict):
     role: Literal["user", "assistant"]
     text: str
+
+
+class ConverseMessage(TypedDict):
+    role: Literal["user", "assistant"]
+    content: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class ToolTurn:
+    message: ConverseMessage
+    stop_reason: str
 
 
 class ChatModel(Protocol):
@@ -41,16 +53,35 @@ class BedrockModel:
         self.client = client
 
     def converse(self, system: str, messages: Sequence[Message]) -> str:
-        response = self.client.converse(
-            modelId=self.model_id,
-            system=[{"text": system}],
-            messages=[{"role": m["role"], "content": [{"text": m["text"]}]} for m in messages],
-            inferenceConfig={"maxTokens": self.max_tokens, "temperature": self.temperature},
-        )
+        transcript: list[ConverseMessage] = [
+            {"role": m["role"], "content": [{"text": m["text"]}]} for m in messages
+        ]
+        response = self._converse(system, transcript)
         blocks = response["output"]["message"]["content"]
         return "".join(block.get("text", "") for block in blocks)
 
-    # TODO(bedrock): tool use (toolConfig), retries on throttling, token usage reporting.
+    def converse_with_tools(
+        self,
+        system: str,
+        messages: Sequence[ConverseMessage],
+        tool_config: dict[str, Any],
+    ) -> ToolTurn:
+        """Send one turn using native Bedrock blocks; never execute tools."""
+        response = self._converse(system, messages, toolConfig=tool_config)
+        return ToolTurn(response["output"]["message"], response["stopReason"])
+
+    def _converse(
+        self, system: str, messages: Sequence[ConverseMessage], **options: Any
+    ) -> dict[str, Any]:
+        return self.client.converse(
+            modelId=self.model_id,
+            system=[{"text": system}],
+            messages=list(messages),
+            inferenceConfig={"maxTokens": self.max_tokens, "temperature": self.temperature},
+            **options,
+        )
+
+    # TODO(bedrock): retries on throttling, token usage reporting.
 
 
 class FakeModel:
