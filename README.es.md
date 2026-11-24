@@ -65,6 +65,37 @@ change = cm.request("docs-manager", "run-1", "docs-writer", "prompts/docs-writer
 Los modelos corren con la API Converse de Bedrock (`BedrockModel("<id-de-modelo-claude-o-inference-profile>")`);
 las pruebas usan `FakeModel` y nunca tocan la red.
 
+## Enviar el resultado de una herramienta a Bedrock
+
+Usa `BedrockModel.converse_with_tools(system, transcript, tool_config)` con un
+modelo compatible con herramientas y un diccionario nativo `toolConfig` de Bedrock
+(con `tools`). El adaptador hace una solicitud a Converse y devuelve el mensaje
+completo del asistente y el motivo de parada. No ejecuta herramientas. La API
+`converse` para solo texto no cambia.
+
+Este ejemplo supone una sola solicitud para `lookup_docs`, una herramienta ficticia
+de solo lectura. Valida el nombre y la entrada en tu aplicación antes de ejecutar
+cualquier herramienta.
+
+```python
+turn = model.converse_with_tools(system, transcript, tool_config)
+if turn.stop_reason == "tool_use":
+    request = next(block["toolUse"] for block in turn.message["content"] if "toolUse" in block)
+    if request["name"] == "lookup_docs" and request["input"] == {"page": "setup"}:
+        reply = {
+            "role": "user",
+            "content": [{"toolResult": {
+                "toolUseId": request["toolUseId"],
+                "content": [{"json": {"found": True}}],
+            }}],
+        }
+        turn = model.converse_with_tools(system, [*transcript, turn.message, reply], tool_config)
+```
+
+Conserva el mensaje completo del asistente en el historial, incluso si también incluye
+texto. Si hay varias solicitudes de herramientas, envía un bloque de resultado por
+cada identificador en un solo mensaje de usuario.
+
 ## Monitorear un área sin llamar al modelo
 
 Ejecuta dos veces el ejemplo del área ficticia de documentación desde la raíz del repositorio:
@@ -111,7 +142,7 @@ ejecutes revisiones simultáneas de la misma área para que no se sobrescriba su
 | `agent_hierarchy/escalation.py` | Rutas de escalamiento y preguntas a humanos |
 | `agent_hierarchy/changes.py` | Respaldo, límite de cambios, archivos ocupados, evaluación, restauración |
 | `agent_hierarchy/monitor.py` | Recopila señales del área, guarda el estado y decide si despierta al gerente |
-| `agent_hierarchy/bedrock.py` | Stub: adaptador Converse + `FakeModel` (tool use pendiente) |
+| `agent_hierarchy/bedrock.py` | Adaptador Converse con mensajes para herramientas + `FakeModel` |
 | `agent_hierarchy/evals.py` | Stub: califica corridas grabadas (ciclo de replay pendiente) |
 
 ## Ligas
