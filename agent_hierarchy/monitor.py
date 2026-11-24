@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
@@ -76,7 +79,19 @@ def save_snapshot(path: str | Path, snapshot: AreaSnapshot) -> None:
         "open_exceptions": sorted(snapshot.open_exceptions),
         "open_requests": snapshot.open_requests,
     }
-    target.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    # Write to a temp file in the same directory, then atomically replace the target, so an
+    # interrupted save never leaves a truncated JSON (load_snapshot keeps reading the old one).
+    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
 
 
 def should_wake(previous: AreaSnapshot | None, current: AreaSnapshot) -> WakeDecision:

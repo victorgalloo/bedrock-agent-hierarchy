@@ -78,3 +78,24 @@ def test_corrupt_snapshot_is_not_treated_as_first_run(tmp_path: Path) -> None:
     path.write_text('{"iso_week": "2026-W03", "open_requests": "invalid"}', encoding="utf-8")
     with pytest.raises(ValidationError):
         load_snapshot(path)
+
+
+def test_interrupted_save_keeps_previous_snapshot(tmp_path: Path, monkeypatch) -> None:
+    import os as _os
+
+    import pytest
+
+    path = tmp_path / "area.json"
+    first = collect_snapshot(date(2026, 11, 23), [], blocked_routines=["link-checker"])
+    save_snapshot(path, first)
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_os, "replace", boom)
+    second = collect_snapshot(date(2026, 11, 30), [], blocked_routines=[])
+    with pytest.raises(OSError):
+        save_snapshot(path, second)
+
+    assert load_snapshot(path) == first
+    assert [p.name for p in tmp_path.iterdir()] == ["area.json"]
