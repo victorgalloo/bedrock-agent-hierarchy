@@ -112,6 +112,28 @@ Use a separate snapshot path for each area. In each check, load the previous sna
 a skip lets a cleared exception count as new if it returns. A new ISO week or any open request also
 wakes the manager. Serialize checks for the same area so they don't overwrite each other's state.
 
+## Replay an evaluation offline
+
+Run `python examples/eval_replay.py` to score a fictional docs review with `FakeModel`.
+It prints `docs-review: pass` and makes no network calls.
+
+Use `agent_hierarchy.evals.replay_fixture(org, path, model)` with a JSON fixture containing
+`name`, a `system` prompt, and a nonempty `turns` array of user messages in order. Replay sends
+each turn with all earlier messages to the model. Every reply must be a JSON object with an
+`events` array (empty if nothing happened), with only events newly reported in that turn:
+
+| Event `type` | Other fields |
+|---|---|
+| `escalation` | `sender`, `recipient`, optional `topic` (required when the recipient is human) |
+| `change` | `reviewer`, `run_id`, `path` |
+| `evaluation` | `change`, `verdict` (`keep` or `revert`), optional boolean `restored` (defaults to false) |
+
+The score checks routes, change counts across turns, and reported restores. Replay never
+executes events or checks that an action happened. Malformed fixtures or replies raise a
+validation error; a noncompliant run returns a failing score. You can also pass a configured
+`BedrockModel`, which calls the live service. Recording live runs and reporting trends are
+not yet implemented.
+
 ## Design rules
 
 1. **Org chart as data.** `org.yaml` is the single source of truth, validated on load.
@@ -136,7 +158,7 @@ wakes the manager. Serialize checks for the same area so they don't overwrite ea
 | `agent_hierarchy/changes.py` | Backup, change limits, busy files, evaluation, restore |
 | `agent_hierarchy/monitor.py` | Collects area signals, persists snapshots and decides whether to wake |
 | `agent_hierarchy/bedrock.py` | Converse adapter with tool-use messages + `FakeModel` |
-| `agent_hierarchy/evals.py` | Stub: scores recorded runs (replay loop TODO) |
+| `agent_hierarchy/evals.py` | Scores recorded events and replays fixtures through a model |
 
 ## Links
 

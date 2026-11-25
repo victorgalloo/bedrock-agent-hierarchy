@@ -119,6 +119,30 @@ despiertas al gerente. Esto permite detectar como nueva una excepción que se re
 aparecer. Una nueva semana ISO o cualquier encargo abierto también despierta al gerente. No
 ejecutes revisiones simultáneas de la misma área para que no se sobrescriba su estado.
 
+## Reproducir una evaluación sin conexión
+
+Ejecuta `python examples/eval_replay.py` para evaluar una revisión ficticia del área de
+documentación con `FakeModel`. Muestra `docs-review: pass` y no hace llamadas de red.
+
+Usa `agent_hierarchy.evals.replay_fixture(org, path, model)` con un archivo JSON que contenga
+`name`, el prompt de sistema `system` y una lista no vacía `turns` con mensajes de usuario en
+orden. La función envía cada turno al modelo con todos los mensajes anteriores. Cada
+respuesta debe ser un objeto JSON con una lista `events` (vacía si no pasó nada), que incluya
+solo los eventos nuevos de ese turno:
+
+| `type` del evento | Otros campos |
+|---|---|
+| `escalation` | `sender`, `recipient`, `topic` opcional (obligatorio si el destinatario es humano) |
+| `change` | `reviewer`, `run_id`, `path` |
+| `evaluation` | `change`, `verdict` (`keep` o `revert`), booleano opcional `restored` (por defecto, falso) |
+
+El puntaje comprueba las rutas, el número de cambios entre turnos y las restauraciones
+declaradas. La función no ejecuta los eventos ni verifica que hayan ocurrido. Si el archivo
+o una respuesta no tiene el formato esperado, se lanza un error de validación; si la
+corrida incumple alguna regla, el puntaje indica que no pasó. También puedes usar un
+`BedrockModel` configurado, que llama al servicio en vivo. Aún no se pueden grabar corridas
+reales ni generar informes de tendencias.
+
 ## Reglas de diseño
 
 1. **El organigrama es un dato.** `org.yaml` es la única fuente de verdad y se valida al cargarse.
@@ -143,7 +167,7 @@ ejecutes revisiones simultáneas de la misma área para que no se sobrescriba su
 | `agent_hierarchy/changes.py` | Respaldo, límite de cambios, archivos ocupados, evaluación, restauración |
 | `agent_hierarchy/monitor.py` | Recopila señales del área, guarda el estado y decide si despierta al gerente |
 | `agent_hierarchy/bedrock.py` | Adaptador Converse con mensajes para herramientas + `FakeModel` |
-| `agent_hierarchy/evals.py` | Stub: califica corridas grabadas (ciclo de replay pendiente) |
+| `agent_hierarchy/evals.py` | Puntúa eventos grabados y reproduce casos de prueba con un modelo |
 
 ## Ligas
 
