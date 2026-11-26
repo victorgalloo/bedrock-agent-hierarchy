@@ -118,9 +118,10 @@ Run `python examples/eval_replay.py` to score a fictional docs review with `Fake
 It prints `docs-review: pass` and makes no network calls.
 
 Use `agent_hierarchy.evals.replay_fixture(org, path, model)` with a JSON fixture containing
-`name`, a `system` prompt, and a nonempty `turns` array of user messages in order. Replay sends
-each turn with all earlier messages to the model. Every reply must be a JSON object with an
-`events` array (empty if nothing happened), with only events newly reported in that turn:
+`name`, a `system` prompt, and a nonempty `turns` array of user messages in order. Replay adds
+the org's member names, reporting lines, and JSON-only instructions to the system prompt.
+It sends each turn with all earlier messages to the model. Each reply must be a JSON object
+with an `events` array (empty if nothing happened), reporting only new events for that turn:
 
 | Event `type` | Other fields |
 |---|---|
@@ -128,11 +129,12 @@ each turn with all earlier messages to the model. Every reply must be a JSON obj
 | `change` | `reviewer`, `run_id`, `path` |
 | `evaluation` | `change`, `verdict` (`keep` or `revert`), optional boolean `restored` (defaults to false) |
 
-The score checks routes, change counts across turns, and reported restores. Replay never
-executes events or checks that an action happened. Malformed fixtures or replies raise a
-validation error; a noncompliant run returns a failing score. You can also pass a configured
-`BedrockModel`, which calls the live service. Recording live runs and reporting trends are
-not yet implemented.
+Replay also accepts one fenced JSON block surrounded by prose. If a reply is invalid, replay
+stops and returns a failing score with the turn number in `Score.error`. An invalid fixture
+still raises a validation error. The score checks routes, change counts across turns, and
+reported restores; replay never executes events or verifies that an action happened. You can
+also pass a configured `BedrockModel`, which sends the prompt and org context to the live
+service. Recording live runs and reporting trends are not yet implemented.
 
 ## Design rules
 

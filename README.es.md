@@ -126,9 +126,10 @@ documentación con `FakeModel`. Muestra `docs-review: pass` y no hace llamadas d
 
 Usa `agent_hierarchy.evals.replay_fixture(org, path, model)` con un archivo JSON que contenga
 `name`, el prompt de sistema `system` y una lista no vacía `turns` con mensajes de usuario en
-orden. La función envía cada turno al modelo con todos los mensajes anteriores. Cada
-respuesta debe ser un objeto JSON con una lista `events` (vacía si no pasó nada), que incluya
-solo los eventos nuevos de ese turno:
+orden. La función agrega al prompt los nombres y las líneas de reporte del organigrama, y
+pide que la respuesta sea solo JSON. Envía cada turno al modelo con todos los mensajes
+anteriores. Cada respuesta debe ser un objeto JSON con una lista `events` (vacía si no pasó
+nada) que incluya solo los eventos nuevos de ese turno:
 
 | `type` del evento | Otros campos |
 |---|---|
@@ -136,12 +137,13 @@ solo los eventos nuevos de ese turno:
 | `change` | `reviewer`, `run_id`, `path` |
 | `evaluation` | `change`, `verdict` (`keep` o `revert`), booleano opcional `restored` (por defecto, falso) |
 
-El puntaje comprueba las rutas, el número de cambios entre turnos y las restauraciones
-declaradas. La función no ejecuta los eventos ni verifica que hayan ocurrido. Si el archivo
-o una respuesta no tiene el formato esperado, se lanza un error de validación; si la
-corrida incumple alguna regla, el puntaje indica que no pasó. También puedes usar un
-`BedrockModel` configurado, que llama al servicio en vivo. Aún no se pueden grabar corridas
-reales ni generar informes de tendencias.
+La función también acepta un solo bloque de código JSON rodeado de texto. Si una respuesta no
+es válida, se detiene y devuelve un puntaje fallido con el número de turno en `Score.error`.
+Un archivo inválido sigue provocando un error de validación. El puntaje comprueba las rutas,
+el número de cambios entre turnos y las restauraciones declaradas; la función no ejecuta ni
+verifica los eventos. También puedes usar un `BedrockModel` configurado, que envía el prompt y
+el contexto del organigrama al servicio en vivo. Aún no se pueden grabar corridas reales ni
+generar informes de tendencias.
 
 ## Reglas de diseño
 

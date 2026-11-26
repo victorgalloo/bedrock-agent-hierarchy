@@ -45,10 +45,16 @@ def test_replay_scores_events_across_turns(org: OrgChart, replay_path: Path, nam
 
     assert score == replace(score_fixture(org, recorded_path), name="docs")
     first = {"role": "user", "text": "Start."}
+    system = model.calls[0][0]
+    assert system.startswith("Report events.")
+    assert "docs-manager -> orchestrator" in system
+    assert "docs-writer -> docs-manager" in system
+    assert "link-checker -> docs-writer" in system
+    assert "only a JSON object" in system
     assert model.calls == [
-        ("Report events.", [first]),
+        (system, [first]),
         (
-            "Report events.",
+            system,
             [
                 first,
                 {"role": "assistant", "text": replies[0]},
@@ -58,20 +64,43 @@ def test_replay_scores_events_across_turns(org: OrgChart, replay_path: Path, nam
     ]
 
 
+def test_replay_accepts_fenced_json_with_surrounding_prose(
+    org: OrgChart, replay_path: Path
+) -> None:
+    reply = '{"events":[{"type":"escalation","sender":"docs-manager","recipient":"orchestrator"}]}'
+    model = FakeModel([f"Here is the event:\n```json\n{reply}\n```\nThat is all.", '{"events":[]}'])
+
+    score = replay_fixture(org, replay_path, model)
+
+    assert score.passed
+    assert (score.escalations_correct, score.escalations_total) == (1, 1)
+
+
+def test_replay_reports_prose_on_its_turn(org: OrgChart, replay_path: Path) -> None:
+    model = FakeModel(['{"events":[]}', "I don't have access to the docs area."])
+
+    score = replay_fixture(org, replay_path, model)
+
+    assert not score.passed
+    assert score.error == "turn 2: expected a JSON object with a valid events array"
+
+
 @pytest.mark.parametrize(
     "reply",
     [
-        "not JSON",
         "{}",
+        '[{"events":[]}]',
         '{"events":[{"type":"unknown"}]}',
         '{"events":[{"type":"change","run_id":"r1","path":"a.md"}]}',
         '{"events":[{"type":"evaluation","change":"c0","verdict":"revert","restored":"false"}]}',
+        '```json\n{"events":[]}\n```\n```json\n{"events":[]}\n```',
     ],
 )
 def test_replay_rejects_invalid_reply(org: OrgChart, replay_path: Path, reply: str) -> None:
     model = FakeModel([reply])
-    with pytest.raises(ValidationError):
-        replay_fixture(org, replay_path, model)
+    score = replay_fixture(org, replay_path, model)
+    assert not score.passed
+    assert score.error == "turn 1: expected a JSON object with a valid events array"
     assert len(model.calls) == 1
 
 
