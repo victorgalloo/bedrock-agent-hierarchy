@@ -119,6 +119,32 @@ despiertas al gerente. Esto permite detectar como nueva una excepción que se re
 aparecer. Una nueva semana ISO o cualquier encargo abierto también despierta al gerente. No
 ejecutes revisiones simultáneas de la misma área para que no se sobrescriba su estado.
 
+## Reproducir una evaluación sin conexión
+
+Ejecuta `python examples/eval_replay.py` para evaluar una revisión ficticia del área de
+documentación con `FakeModel`. Muestra `docs-review: pass` y no hace llamadas de red.
+
+Usa `agent_hierarchy.evals.replay_fixture(org, path, model)` con un archivo JSON que contenga
+`name`, el prompt de sistema `system` y una lista no vacía `turns` con mensajes de usuario en
+orden. La función agrega al prompt los nombres y las líneas de reporte del organigrama, y
+pide que la respuesta sea solo JSON. Envía cada turno al modelo con todos los mensajes
+anteriores. Cada respuesta debe ser un objeto JSON con una lista `events` (vacía si no pasó
+nada) que incluya solo los eventos nuevos de ese turno:
+
+| `type` del evento | Otros campos |
+|---|---|
+| `escalation` | `sender`, `recipient`, `topic` opcional (obligatorio si el destinatario es humano) |
+| `change` | `reviewer`, `run_id`, `path` |
+| `evaluation` | `change`, `verdict` (`keep` o `revert`), booleano opcional `restored` (por defecto, falso) |
+
+La función también acepta un solo bloque de código JSON rodeado de texto. Si una respuesta no
+es válida, se detiene y devuelve un puntaje fallido con el número de turno en `Score.error`.
+Un archivo inválido sigue provocando un error de validación. El puntaje comprueba las rutas,
+el número de cambios entre turnos y las restauraciones declaradas; la función no ejecuta ni
+verifica los eventos. También puedes usar un `BedrockModel` configurado, que envía el prompt y
+el contexto del organigrama al servicio en vivo. Aún no se pueden grabar corridas reales ni
+generar informes de tendencias.
+
 ## Reglas de diseño
 
 1. **El organigrama es un dato.** `org.yaml` es la única fuente de verdad y se valida al cargarse.
@@ -143,7 +169,7 @@ ejecutes revisiones simultáneas de la misma área para que no se sobrescriba su
 | `agent_hierarchy/changes.py` | Respaldo, límite de cambios, archivos ocupados, evaluación, restauración |
 | `agent_hierarchy/monitor.py` | Recopila señales del área, guarda el estado y decide si despierta al gerente |
 | `agent_hierarchy/bedrock.py` | Adaptador Converse con mensajes para herramientas + `FakeModel` |
-| `agent_hierarchy/evals.py` | Stub: califica corridas grabadas (ciclo de replay pendiente) |
+| `agent_hierarchy/evals.py` | Puntúa eventos grabados y reproduce casos de prueba con un modelo |
 
 ## Ligas
 

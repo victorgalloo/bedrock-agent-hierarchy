@@ -1,0 +1,8 @@
+{
+  "name": "docs-review",
+  "system": "Review the fictional docs area. Reply with a JSON object containing only an events array. An escalation has type, sender, recipient, and a topic if the recipient is human. A change has type, reviewer, run_id, and path.",
+  "turns": [
+    "Simulated fact: docs-writer reported two failed runs. Emit one escalation from docs-manager to their direct supervisor.",
+    "Record one proposed change to prompts/docs-writer.md for reviewer docs-manager in run r1. Do not claim to have edited the file."
+  ]
+}
