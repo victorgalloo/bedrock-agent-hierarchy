@@ -92,6 +92,29 @@ if turn.stop_reason == "tool_use":
 Keep the entire assistant message in the transcript, even when it also contains text.
 For multiple tool requests, send a matching result block for each ID in one user message.
 
+## Throttling retries and token usage
+
+`BedrockModel` retries throttling errors (`ThrottlingException`, `TooManyRequestsException`,
+`Throttling`, `RequestLimitExceeded`, and HTTP 429 responses) with capped exponential backoff
+(`max_retries=3`, `retry_base_delay=0.5`, `retry_max_delay=8.0`). Other errors are raised
+immediately. Set `max_retries=0` to disable adapter retries when relying on `boto3`'s own retry
+configuration.
+
+Each successful Converse response that includes a `usage` block updates `model.last_usage` and
+accumulates into `model.total_usage` (`TokenUsage`). `converse_with_tools` also exposes the turn's
+usage on `turn.usage`, and an optional `on_usage` callback receives each `TokenUsage` as it arrives:
+
+```python
+from agent_hierarchy.bedrock import BedrockModel, TokenUsage
+
+def log_usage(usage: TokenUsage) -> None:
+    print(f"tokens: in={usage.input_tokens} out={usage.output_tokens} total={usage.total_tokens}")
+
+model = BedrockModel("us.example-profile-id", max_retries=3, on_usage=log_usage)
+reply = model.converse("Review the fictional docs area.", [{"role": "user", "text": "Status?"}])
+print(model.total_usage)
+```
+
 ## Monitor an area without calling a model
 
 Run the fictional docs-area example twice from the repository root:
@@ -159,7 +182,7 @@ service. Recording live runs and reporting trends are not yet implemented.
 | `agent_hierarchy/escalation.py` | Escalation routes and human questions |
 | `agent_hierarchy/changes.py` | Backup, change limits, busy files, evaluation, restore |
 | `agent_hierarchy/monitor.py` | Collects area signals, persists snapshots and decides whether to wake |
-| `agent_hierarchy/bedrock.py` | Converse adapter with tool-use messages + `FakeModel` |
+| `agent_hierarchy/bedrock.py` | Converse adapter with tool-use messages, throttling retries, token usage + `FakeModel` |
 | `agent_hierarchy/evals.py` | Scores recorded events and replays fixtures through a model |
 
 ## Links
