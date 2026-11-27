@@ -96,6 +96,29 @@ Conserva el mensaje completo del asistente en el historial, incluso si también 
 texto. Si hay varias solicitudes de herramientas, envía un bloque de resultado por
 cada identificador en un solo mensaje de usuario.
 
+## Reintentos por límite de tasa y uso de tokens
+
+`BedrockModel` reintenta los errores de límite de tasa (`ThrottlingException`,
+`TooManyRequestsException`, `Throttling`, `RequestLimitExceeded` y respuestas HTTP 429) con espera
+exponencial acotada (`max_retries=3`, `retry_base_delay=0.5`, `retry_max_delay=8.0`). Cualquier
+otro error se propaga de inmediato. Usa `max_retries=0` para desactivar los reintentos del adaptador
+si prefieres usar la configuración de reintentos de `boto3`.
+
+Cada respuesta exitosa de Converse que incluye un bloque `usage` actualiza `model.last_usage` y se
+acumula en `model.total_usage` (`TokenUsage`). `converse_with_tools` también expone el uso del turno
+en `turn.usage`, y el callback opcional `on_usage` recibe cada `TokenUsage` al completarse la llamada:
+
+```python
+from agent_hierarchy.bedrock import BedrockModel, TokenUsage
+
+def log_usage(usage: TokenUsage) -> None:
+    print(f"tokens: in={usage.input_tokens} out={usage.output_tokens} total={usage.total_tokens}")
+
+model = BedrockModel("us.example-profile-id", max_retries=3, on_usage=log_usage)
+reply = model.converse("Revisa el área ficticia de documentación.", [{"role": "user", "text": "¿Estado?"}])
+print(model.total_usage)
+```
+
 ## Monitorear un área sin llamar al modelo
 
 Ejecuta dos veces el ejemplo del área ficticia de documentación desde la raíz del repositorio:
@@ -186,7 +209,7 @@ ni consultar organigramas históricos. Para puntuar un solo registro, usa `score
 | `agent_hierarchy/escalation.py` | Rutas de escalamiento y preguntas a humanos |
 | `agent_hierarchy/changes.py` | Respaldo, límite de cambios, archivos ocupados, evaluación, restauración |
 | `agent_hierarchy/monitor.py` | Recopila señales del área, guarda el estado y decide si despierta al gerente |
-| `agent_hierarchy/bedrock.py` | Adaptador Converse con mensajes para herramientas + `FakeModel` |
+| `agent_hierarchy/bedrock.py` | Adaptador Converse con herramientas, reintentos por límite de tasa, uso de tokens + `FakeModel` |
 | `agent_hierarchy/evals.py` | Registra eventos, puntúa tendencias por área y reproduce casos de prueba con un modelo |
 
 ## Ligas
