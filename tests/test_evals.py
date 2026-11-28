@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ from pydantic import ValidationError
 
 from agent_hierarchy import OrgChart
 from agent_hierarchy.bedrock import FakeModel
-from agent_hierarchy.evals import replay_fixture, score_fixture
+from agent_hierarchy.evals import record_run, replay_fixture, score_fixture, score_trends
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -22,6 +23,63 @@ def test_scores_recorded_runs(org: OrgChart) -> None:
     assert bad.escalations_correct == 0
     assert not bad.change_limit_respected
     assert (bad.reverts_applied, bad.reverts_total) == (0, 1)
+
+
+def test_records_runs_and_scores_each_area_in_time_order(org: OrgChart, tmp_path: Path) -> None:
+    bad_at = datetime(2026, 1, 2, 9, tzinfo=UTC)
+    good_at = datetime(2026, 1, 2, 8, tzinfo=timezone(timedelta(hours=-2)))
+    bad_path, good_path, release_path = (tmp_path / f"{n}.json" for n in ("z", "a", "release"))
+    bad = json.loads((FIXTURES / "docs-run-bad.json").read_text(encoding="utf-8"))
+    good = json.loads((FIXTURES / "docs-run-ok.json").read_text(encoding="utf-8"))
+
+    record_run(good_path, area="docs", recorded_at=good_at, **good)
+    record_run(bad_path, area="docs", recorded_at=bad_at, **bad)
+    record_run(release_path, area="release", name="release-check", recorded_at=bad_at, events=[])
+
+    trends = score_trends(org, [good_path, release_path, bad_path])
+
+    assert set(trends) == {"docs", "release"}
+    assert [entry.recorded_at for entry in trends["docs"]] == [bad_at, good_at.astimezone(UTC)]
+    assert [entry.score for entry in trends["docs"]] == [
+        score_fixture(org, FIXTURES / "docs-run-bad.json"),
+        score_fixture(org, FIXTURES / "docs-run-ok.json"),
+    ]
+    assert trends["release"][0].score.passed
+    assert score_fixture(org, good_path) == trends["docs"][1].score
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"recorded_at": datetime(2026, 1, 2)},
+        {"area": ""},
+        {
+            "events": [
+                {"type": "evaluation", "change": "c1", "verdict": "revert", "restored": "yes"}
+            ]
+        },
+    ],
+)
+def test_recording_rejects_invalid_runs_before_writing(tmp_path: Path, overrides: dict) -> None:
+    path = tmp_path / "invalid.json"
+    run = {
+        "area": "docs",
+        "name": "docs-check",
+        "recorded_at": datetime(2026, 1, 2, tzinfo=UTC),
+        "events": [],
+    }
+    with pytest.raises(ValidationError):
+        record_run(path, **(run | overrides))
+    assert not path.exists()
+
+
+def test_recording_does_not_overwrite_a_run(tmp_path: Path) -> None:
+    path = tmp_path / "run.json"
+    params = {"area": "docs", "recorded_at": datetime(2026, 1, 2, tzinfo=UTC), "events": []}
+    record_run(path, name="first", **params)
+    with pytest.raises(FileExistsError):
+        record_run(path, name="second", **params)
+    assert json.loads(path.read_text(encoding="utf-8"))["name"] == "first"
 
 
 @pytest.fixture

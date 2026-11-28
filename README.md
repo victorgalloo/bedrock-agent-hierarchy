@@ -157,7 +157,25 @@ stops and returns a failing score with the turn number in `Score.error`. An inva
 still raises a validation error. The score checks routes, change counts across turns, and
 reported restores; replay never executes events or verifies that an action happened. You can
 also pass a configured `BedrockModel`, which sends the prompt and org context to the live
-service. Recording live runs and reporting trends are not yet implemented.
+service.
+
+## Record completed runs and check scores over time
+
+Run `python examples/eval_recording.py` to see a fictional docs area go from `fail` to `pass`.
+The example uses temporary files and makes no network calls.
+
+After a live run finishes, call `agent_hierarchy.evals.record_run(path, area=..., name=...,
+recorded_at=..., events=...)` with its area, run name, timezone-aware completion time and
+observed events in the same format as the table above. The caller collects those events;
+recording does not intercept Bedrock calls or save prompts or replies. Remove any sensitive
+data from the events before recording. Use one new JSON file per run in an existing directory;
+recording validates the event structure and refuses to overwrite a file.
+
+Pass the recording paths to `agent_hierarchy.evals.score_trends(org, paths)` to get
+`RunScore` entries grouped by area and ordered oldest first, with UTC timestamps and full
+scores. Use the org chart you want to evaluate against: the report scores the recorded events
+at report time, without running a model or evaluating historical org charts. To score just one
+recording, use `score_fixture(org, path)`.
 
 ## Design rules
 
@@ -183,7 +201,7 @@ service. Recording live runs and reporting trends are not yet implemented.
 | `agent_hierarchy/changes.py` | Backup, change limits, busy files, evaluation, restore |
 | `agent_hierarchy/monitor.py` | Collects area signals, persists snapshots and decides whether to wake |
 | `agent_hierarchy/bedrock.py` | Converse adapter with tool-use messages, throttling retries, token usage + `FakeModel` |
-| `agent_hierarchy/evals.py` | Scores recorded events and replays fixtures through a model |
+| `agent_hierarchy/evals.py` | Records run events, scores trends per area and replays fixtures through a model |
 
 ## Links
 

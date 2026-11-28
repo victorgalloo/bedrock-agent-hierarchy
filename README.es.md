@@ -165,8 +165,26 @@ es válida, se detiene y devuelve un puntaje fallido con el número de turno en 
 Un archivo inválido sigue provocando un error de validación. El puntaje comprueba las rutas,
 el número de cambios entre turnos y las restauraciones declaradas; la función no ejecuta ni
 verifica los eventos. También puedes usar un `BedrockModel` configurado, que envía el prompt y
-el contexto del organigrama al servicio en vivo. Aún no se pueden grabar corridas reales ni
-generar informes de tendencias.
+el contexto del organigrama al servicio en vivo.
+
+## Registrar corridas terminadas y consultar los puntajes en el tiempo
+
+Ejecuta `python examples/eval_recording.py` para ver cómo un área ficticia de documentación
+pasa de `fail` a `pass`. El ejemplo usa archivos temporales y no hace llamadas de red.
+
+Al terminar una corrida real, llama a `agent_hierarchy.evals.record_run(path, area=..., name=...,
+recorded_at=..., events=...)` con el área, el nombre, la fecha y hora de finalización con zona
+horaria y los eventos observados en el formato de la tabla anterior. Quien llama a la función
+recopila esos eventos; el registro no intercepta llamadas a Bedrock ni guarda prompts o
+respuestas. Elimina cualquier dato sensible de los eventos antes de registrarlos. Usa un archivo
+JSON nuevo por corrida en un directorio existente; la función valida la estructura de los
+eventos y no sobrescribe archivos.
+
+Pasa las rutas de los registros a `agent_hierarchy.evals.score_trends(org, paths)` para
+obtener entradas `RunScore` agrupadas por área, de la más antigua a la más reciente, con fechas
+y horas en UTC y el detalle de cada puntaje. Usa el organigrama con el que quieras evaluar:
+el informe puntúa los eventos registrados en el momento de la consulta, sin ejecutar un modelo
+ni consultar organigramas históricos. Para puntuar un solo registro, usa `score_fixture(org, path)`.
 
 ## Reglas de diseño
 
@@ -192,7 +210,7 @@ generar informes de tendencias.
 | `agent_hierarchy/changes.py` | Respaldo, límite de cambios, archivos ocupados, evaluación, restauración |
 | `agent_hierarchy/monitor.py` | Recopila señales del área, guarda el estado y decide si despierta al gerente |
 | `agent_hierarchy/bedrock.py` | Adaptador Converse con herramientas, reintentos por límite de tasa, uso de tokens + `FakeModel` |
-| `agent_hierarchy/evals.py` | Puntúa eventos grabados y reproduce casos de prueba con un modelo |
+| `agent_hierarchy/evals.py` | Registra eventos, puntúa tendencias por área y reproduce casos de prueba con un modelo |
 
 ## Ligas
 
